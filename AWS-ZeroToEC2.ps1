@@ -235,58 +235,12 @@ try {
         }
     }
     # SSH to EC2 instance and invoke required OS customizations
-    ssh -i  "$($(Get-Location))/keypair-$($AWSAccountNameValue).pem" ec2-user@$ec2publicip -oStrictHostKeyChecking=no "/usr/bin/sudo bash -c '`
-    sudo yum update --assumeyes; `
-    sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1; `
-    sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1; `
-    sudo yum install ntp --assumeyes; `
-    sudo chkconfig ntpd on; `
-    sudo yum install telnet telnet-server --assumeyes;  `
-    sudo yum install mtr  --assumeyes; `
-    sudo yum update --assumeyes; `
-    echo 65535 > /proc/sys/fs/file-max; `
-    echo fs.file-max=65535 >> /etc/sysctl.conf; `
-    ulimit -n 65535'"
-    Write-Host -ForegroundColor Green "OS Customized successfully"
+    ssh -i  "$($(Get-Location))/keypair-$($AWSAccountNameValue).pem" ec2-user@$ec2publicip -oStrictHostKeyChecking=no
 }
 catch {
     Write-Host -ForegroundColor Red "Unable to SSH to instance and/or complete OS customizations"
 }
 
-# Transfer required config files to /tmp/ on instance
-foreach ($file in (Get-ChildItem "$($(Get-Location))/transfer" -Recurse)) {
-    try {
-        $remotepath = "ec2-user@$($ec2publicip):/tmp/$($file.Name)"
-        scp -i "$($(Get-Location))/keypair-$($AWSAccountNameValue).pem" $file $remotepath
-        Write-Host -ForegroundColor Green "Successfully transferred file $file to $remotepath" 
-    }
-    catch { 
-        Write-Host -ForegroundColor Red "Failed to transfer file $file to instance"
-    }
-}
-
-# Connect to EC2 instance using SSH, install components required to run web app and bring web app online
-try {
-    $ec2publicip = (Get-EC2Instance -InstanceID $($ec2instance.Instances.InstanceId) | Select -ExpandProperty Instances).PublicIPAddress
-    Write-Host -ForegroundColor Yellow "Waiting for SSH to become available.."
-    # Wait for EC2 instance to become reachable via SSH
-    if ($PSEdition -eq "Core") {
-        while ((Test-Connection $ec2publicip -TCPPort 22) -ne "True") {
-            Start-Sleep -seconds 2
-            Write-Host -ForegroundColor Yellow "Waiting for SSH to become available.."
-        }
-    }
-    else {
-        while (((Test-NetConnection $ec2publicip -Port 22).TCPTestSucceeded) -ne "True") {
-            Start-Sleep -seconds 2
-            Write-Host -ForegroundColor Yellow "Waiting for SSH to become available.."
-        }
-    }
-    ssh -i  "$($(Get-Location))/keypair-$($AWSAccountNameValue).pem" ec2-user@$ec2publicip -oStrictHostKeyChecking=no
-}
-catch {
-    Write-Host -ForegroundColor Red "Unable to SSH to instance"
-}
 
 
 # Revoke open SSH access to security group
